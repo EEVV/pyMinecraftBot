@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import struct
 
+
 class TypeObject(ABC):
 	@classmethod
 	@abstractmethod
@@ -42,17 +43,17 @@ class Boolean(TypeObject):
 		return returnObject
 
 	@classmethod
-	def fromValue(cls, value):
+	def fromValue(cls, boolean):
 		bytebuffer = bytearray()
 
-		if value:
+		if boolean:
 			bytebuffer += b"\x01"
 		
-		if not value:
+		if not boolean:
 			bytebuffer += b"\x00"
 
 		returnObject = cls()
-		returnObject.boolean = value
+		returnObject.boolean = boolean
 		returnObject.bytebuffer = bytebuffer
 
 		return returnObject
@@ -80,10 +81,10 @@ class Byte(TypeObject):
 		return returnObject
 
 	@classmethod
-	def fromValue(cls, value):
+	def fromValue(cls, byte):
 		returnObject = cls()
-		returnObject.byte = value
-		returnObject.bytebuffer = value.to_bytes(1, "big", signed = True)
+		returnObject.byte = byte
+		returnObject.bytebuffer = byte.to_bytes(1, "big", signed = True)
 
 		return returnObject
 
@@ -106,10 +107,10 @@ class UnsignedByte(TypeObject):
 		return returnObject
 
 	@classmethod
-	def fromValue(cls, value):
+	def fromValue(cls, byte):
 		returnObject = cls()
-		returnObject.byte = value
-		returnObject.bytebuffer = value.to_bytes(1, "big")
+		returnObject.byte = byte
+		returnObject.bytebuffer = byte.to_bytes(1, "big")
 
 		return returnObject
 
@@ -132,10 +133,10 @@ class Short(TypeObject):
 		return returnObject
 
 	@classmethod
-	def fromValue(cls, value):
+	def fromValue(cls, short):
 		returnObject = cls()
-		returnObject.short = value
-		returnObject.bytebuffer = value.to_bytes(2, "big", signed = True)
+		returnObject.short = short
+		returnObject.bytebuffer = short.to_bytes(2, "big", signed = True)
 
 		return returnObject
 
@@ -158,10 +159,12 @@ class UnsignedShort(TypeObject):
 		return returnObject
 
 	@classmethod
-	def fromValue(cls, value):
+	def fromValue(cls, short):
 		returnObject = cls()
-		returnObject.short = value
-		returnObject.bytebuffer = value.to_bytes(2, "big")
+		returnObject.short = short
+		returnObject.bytebuffer = short.to_bytes(2, "big")
+
+		return returnObject
 
 	def getBytes(self):
 		return self.bytebuffer
@@ -182,10 +185,10 @@ class Int(TypeObject):
 		return returnObject
 
 	@classmethod
-	def fromValue(cls, value):
+	def fromValue(cls, integer):
 		returnObject = cls()
-		returnObject.integer = value
-		returnObject.bytebuffer = value.to_bytes(4, "big", signed = True)
+		returnObject.integer = integer
+		returnObject.bytebuffer = integer.to_bytes(4, "big", signed = True)
 
 		return returnObject
 
@@ -208,9 +211,9 @@ class Long(TypeObject):
 		return returnObject
 
 	@classmethod
-	def fromValue(cls, value):
+	def fromValue(cls, longInteger):
 		returnObject = cls()
-		returnObject.long = value
+		returnObject.long = longInteger
 		returnObject.bytebuffer = value.to_bytes(8, "big")
 
 		return returnObject
@@ -280,7 +283,7 @@ class String(TypeObject):
 	@classmethod
 	def fromValue(cls, string):
 		bytebuffer = string.encode("utf-8")
-		length = VariableInt.fromInt(len(bytebuffer))
+		length = VariableInt.fromValue(len(bytebuffer))
 
 		returnObject = cls()
 		returnObject.bytebuffer = bytebuffer
@@ -290,8 +293,6 @@ class String(TypeObject):
 
 	@classmethod
 	def fromBytes(cls, bytebuffer, index = 0):
-		startIndex = index
-
 		length = VariableInt.fromBytes(bytebuffer, index)
 		stringBytebuffer = bytearray()
 
@@ -346,7 +347,7 @@ class VariableInt(TypeObject):
 				break
 
 		returnObject = cls()
-		returnObject.long = integer
+		returnObject.integer = integer
 		returnObject.bytebuffer = bytebuffer[startIndex:index]
 
 		return returnObject
@@ -367,7 +368,7 @@ class VariableInt(TypeObject):
 		bytebuffer += value.to_bytes(1, "big")
 
 		returnObject = cls()
-		returnObject.long = firstInteger
+		returnObject.integer = firstInteger
 		returnObject.bytebuffer = bytebuffer
 
 		return returnObject
@@ -411,7 +412,7 @@ class VariableLong(TypeObject):
 
 	@classmethod
 	def fromValue(cls, value):
-		firstIntegerLong = value
+		firstLongInteger = value
 
 		bytebuffer = bytearray()
 
@@ -425,7 +426,7 @@ class VariableLong(TypeObject):
 		bytebuffer += value.to_bytes(1, "big")
 
 		returnObject = cls()
-		returnObject.long = firstIntegerLong
+		returnObject.long = firstLongInteger
 		returnObject.bytebuffer = bytebuffer
 
 		return returnObject
@@ -464,3 +465,35 @@ class ByteArray(TypeObject):
 
 	def __len__(self):
 		return len(self.getBytes())
+
+class Position(TypeObject):
+	@classmethod
+	def fromBytes(cls, bytebuffer, index = 0):
+		longInt = Long.fromBytes(bytebuffer).getBytes()
+
+		x = longInt >> 38
+		y = (longInt >> 26) & 0xfff
+		z = longInt & 0x3ffffff
+
+		returnObject = cls()
+		returnObject.position = (x, y, z)
+		returnObject.bytebuffer = longInt
+
+		return returnObject
+
+	@classmethod
+	def fromValue(cls, position):
+		returnObject = cls()
+		returnObject.position = position
+		returnObject.bytebuffer = bytearray((((position[0] & 0x3ffffff) << 38) | ((position[1] & 0xfff) << 26) | (position[2] & 0x3ffffff)).to_bytes(8, "big"))
+
+		return returnObject
+
+	def getBytes(self):
+		return self.bytebuffer
+
+	def getValue(self):
+		return self.position
+
+	def __len__(self):
+		return len(self.bytebuffer)
